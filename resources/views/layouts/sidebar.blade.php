@@ -89,6 +89,10 @@
                 <div x-show="open" class="mt-2 space-y-1 bg-gray-800 rounded-lg p-2" x-collapse>
                     <a href="{{ route('reportes.vacaciones') }}" class="block px-4 py-2 text-sm text-gray-300 hover:text-white hover:bg-gray-700 rounded-md">Reporte de Vacaciones</a>
                 </div>
+                <div x-show="open" class="mt-2 space-y-1 bg-gray-800 rounded-lg p-2" x-collapse>
+                    <a href="{{ route('reportes.cumpleanos') }}" class="block px-4 py-2 text-sm text-gray-300 hover:text-white hover:bg-gray-700 rounded-md">Cumpleañeros del Mes</a>
+                    <a href="{{ route('reportes.cumpleanos.arte') }}" class="block px-4 py-2 text-sm text-gray-300 hover:text-white hover:bg-gray-700 rounded-md">Arte Cumpleañeros</a>
+                </div>
                 
                 
 

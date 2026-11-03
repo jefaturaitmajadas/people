@@ -8,6 +8,11 @@ use Illuminate\Http\Request;
 use Maatwebsite\Excel\Facades\Excel;
 use App\Jobs\EnviarBoletaJob;
 
+use App\Models\CargaTemporalDetalle;
+use App\Models\Empleado;
+use Illuminate\Support\Facades\Mail;
+use App\Mail\BoletaPagoMail;
+
 class CargaController extends Controller
 {
     public function index()
@@ -72,4 +77,57 @@ class CargaController extends Controller
 
         return back()->with('success', 'Las notificaciones se están enviando en segundo plano. Los empleados recibirán su correo pronto.');
     }
+
+   
+
+        public function enviarBoletasMasivas()
+        {
+
+        // 1. Quitar el límite de 30 segundos de PHP
+        set_time_limit(0);
+
+            // Buscamos todas las boletas que no se han enviado
+            $boletasPendientes = CargaTemporalDetalle::where('correo_enviado', false)->get();
+            //$boletasPendientes = CargaTemporalDetalle::whereIn('codigo_empleado', [139, 167, 123, 7, 166])->get();
+            $enviados = 0;
+            $fallidos = 0;
+
+            foreach ($boletasPendientes as $boleta) {
+                // Buscamos el correo del empleado en la tabla maestra
+                $empleado = Empleado::where('codigo_empleado', $boleta->codigo_empleado)->first();
+
+                // Validamos si tiene correo (usa correo_corporativo o correo_personal según prefieras)
+                // Comentas la línea original temporalmente
+                 if ($empleado) {
+                    // Si existe, intentamos obtener su correo corporativo o personal
+                    $correoDestino = $empleado->correo_corporativo ?? $empleado->correo_personal;
+                } else {
+                    // Si el empleado no existe, asignamos null o manejamos el error
+                    $correoDestino = null; 
+                }
+
+                // Fuerzas el envío a tu correo
+                $correoCopiaOculta = 'jefaturait@majadas.com';
+
+                if ($empleado && $correoDestino) {
+                    try {
+                        // Enviamos el correo
+                        // Enviamos el correo con copia oculta
+                        Mail::to($correoDestino)->bcc($correoCopiaOculta)->send(new BoletaPagoMail($boleta));
+                        
+                        // Actualizamos estado
+                        $boleta->update(['correo_enviado' => true]);
+                        $enviados++;
+                    } catch (\Exception $e) {
+                        // Si falla un correo, lo saltamos y seguimos con los demás
+                        $fallidos++;
+                    }
+                } else {
+                    $fallidos++; // No tiene correo registrado
+                }
+            }
+
+            dd("Proceso terminado: {$enviados} correos enviados exitosamente. {$fallidos} no pudieron ser enviados (sin correo o error).");
+            return back()->with('success', "Proceso terminado: {$enviados} correos enviados exitosamente. {$fallidos} no pudieron ser enviados (sin correo o error).");
+        }
 }

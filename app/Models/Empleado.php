@@ -209,9 +209,47 @@ class Empleado extends Model
             'disponible_bruto' => round($disponibleBruto, 2),
             'capital_pendiente' => round($capitalPendiente, 2),
             // Si por alguna razón el pendiente es mayor, devolvemos 0 para no dar saldos negativos
-            'disponible_neto' => $disponibleNeto > 0 ? round($disponibleNeto, 2) : 0, 
+            'disponible_neto' => $disponibleNeto > 0 ? round($disponibleNeto, 2) : 0,
         ];
     }
 
-    
+    // --- Cumpleañeros ---
+
+    // Empleados que cumplen años en el mes indicado y estaban activos en ese mes/año
+    public function scopeCumpleanerosDelMes($query, int $mes, int $anio)
+    {
+        $finMes = \Carbon\Carbon::create($anio, $mes, 1)->endOfMonth()->toDateString();
+
+        return $query->whereNotNull('fecha_nacimiento')
+            ->whereMonth('fecha_nacimiento', $mes)
+            ->where(function ($q) use ($finMes) {
+                $q->whereNull('fecha_inicio')->orWhere('fecha_inicio', '<=', $finMes);
+            })
+            // Solo colaboradores sin fecha de baja (los que ya salieron no se muestran)
+            ->whereNull('fecha_salida')
+            ->orderByRaw('DAY(fecha_nacimiento) asc')
+            ->orderBy('primer_nombre', 'asc');
+    }
+
+    // Correo para notificaciones: corporativo y, si no tiene, el personal
+    public function getCorreoNotificacionAttribute()
+    {
+        if (filled($this->correo_corporativo)) {
+            return trim($this->correo_corporativo);
+        }
+
+        return filled($this->correo_personal) ? trim($this->correo_personal) : null;
+    }
+
+    public function getNombreCortoAttribute()
+    {
+        return trim($this->primer_nombre . ' ' . $this->primer_apellido);
+    }
+
+    public function getNombreCompletoAttribute()
+    {
+        return trim(preg_replace('/\s+/', ' ', implode(' ', [
+            $this->primer_nombre, $this->segundo_nombre, $this->primer_apellido, $this->segundo_apellido,
+        ])));
+    }
 }

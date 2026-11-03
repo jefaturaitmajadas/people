@@ -37,12 +37,24 @@ class PlanillaController extends Controller
 
     public function store(Request $request)
     {
+        
+    
         $request->validate([
             'descripcion' => 'required|string',
             'fecha_inicio' => 'required|date',
             'fecha_fin' => 'required|date|after_or_equal:fecha_inicio',
             'tipo_periodo' => 'required|in:mensual,quincenal,semanal',
         ]);
+
+        
+
+        if($request->tipo_periodo == 'mensual'){
+            $tipoPlanilla = 2;
+        }
+
+        if($request->tipo_periodo == 'quincenal'){
+            $tipoPlanilla = 1;
+        }
 
         try {
             DB::beginTransaction();
@@ -58,7 +70,10 @@ class PlanillaController extends Controller
             ]);
 
             $total_nomina = 0;
-            $empleados = Empleado::all(); 
+            //$empleados = Empleado::where('mano_obra_id',$tipoPlanilla)->where('codigo_empleado',124)->get(); 
+            $empleados = Empleado::where('mano_obra_id',$tipoPlanilla)->whereNull('fecha_salida')->get(); 
+
+            ///dd(count($empleados));
 
             foreach ($empleados as $empleado) {
                 
@@ -79,9 +94,10 @@ class PlanillaController extends Controller
 
                 // B. Salario Proporcional
                 $salario_base = $empleado->salario ?? 0; // Asegúrate que tu campo en la BD sea 'salario' o 'salario_base'
-                $salario_proporcional = ($salario_base / $dias_base) * $dias_trabajados;
+                //$salario_proporcional = ($salario_base / $dias_base) * $dias_trabajados;
+                $salario_proporcional = ($salario_base / 30) * $dias_trabajados;
 
-               
+               //dd($empleado, $dias_base, $dias_trabajados, $proporcional_bono_decreto, $salario_base, $salario_proporcional);
                 // C. Horas Extras
                 $total_horas_extras = HoraExtra::where('empleado_id', $empleado->id)
                     ->where('pagado', false)
@@ -312,7 +328,7 @@ class PlanillaController extends Controller
                 //dd($total_descuentos);
 
                 // H. Líquido a Recibir
-                $liquido = $salario_proporcional + 250 +$total_horas_extras + $total_ingresos - $igss_laboral - $total_descuentos;
+                $liquido = $salario_proporcional + $proporcional_bono_decreto +$total_horas_extras + $total_ingresos - $igss_laboral - $total_descuentos;
 
                 //dd($salario_proporcional , $total_horas_extras , $total_ingresos , $igss_laboral , $total_descuentos);
                     

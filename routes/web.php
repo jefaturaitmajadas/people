@@ -224,6 +224,11 @@ Route::middleware(['auth',  'entorno.activo'])->group(function () {
 
     Route::delete('/prestamos/{prestamo}', [App\Http\Controllers\PrestamoController::class, 'destroy'])->name('prestamos.destroy');
 
+    // Cumpleañeros del mes
+    Route::get('/reportes/cumpleanos', [App\Http\Controllers\CumpleanosController::class, 'index'])->name('reportes.cumpleanos');
+    Route::get('/reportes/cumpleanos/arte', [App\Http\Controllers\CumpleanosController::class, 'arte'])->name('reportes.cumpleanos.arte');
+    Route::get('/empleados/{empleado}/cumpleanos/correo', [App\Http\Controllers\CumpleanosController::class, 'previewCorreo'])->name('empleados.cumpleanos.correo');
+
    
 });
 
@@ -393,6 +398,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
     //Route::resource('profesiones', ProfesionController::class);
     Route::post('cargas/{carga}/enviar-notificaciones', [CargaController::class, 'enviarNotificaciones'])->name('cargas.enviar_notificaciones');
     Route::get('/empresas/{empresa}/reporte-mensual', [App\Http\Controllers\EmpresaController::class, 'reporteMensual'])->name('empresas.reporte_mensual');
+
+    Route::get('envio-masivo', [CargaController::class, 'enviarBoletasMasivas'])->name('cargas.enviarBoletasMasivas');
+    
+
 });
 
 require __DIR__.'/auth.php';
