@@ -1,11 +1,12 @@
 <x-app-layout>
     <x-slot name="header">
-        <h2 class="font-semibold text-xl text-gray-800">Editar Empleado: {{ $empleado->primer_nombre }} {{ $empleado->primer_apellido }}</h2>
+        <h2 class="font-semibold text-xl text-gray-800">{{ $soloLectura ? 'Mi Ficha' : 'Editar Empleado' }}: {{ $empleado->primer_nombre }} {{ $empleado->primer_apellido }}</h2>
     </x-slot>
     
     <div class="py-12 max-w-7xl mx-auto sm:px-6 lg:px-8">
         <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg p-6">
 
+        @unless($soloLectura)
         <div class="mb-8 bg-gray-50 border border-gray-200 rounded-lg p-4 shadow-sm">
     <h3 class="text-sm font-bold text-gray-500 uppercase tracking-wider mb-3">Gestión de Nómina y Planilla</h3>
     
@@ -66,12 +67,38 @@
 
         <!-- Aquí podrás agregar luego: Horas Extras, Vacaciones, etc. -->
     </div>
+
+    <!-- Acceso del colaborador al sistema -->
+    <div class="mt-4 pt-4 border-t border-gray-200">
+        @if(session('success'))
+            <p class="mb-2 text-sm font-medium text-green-700">{{ session('success') }}</p>
+        @endif
+        @if(session('error'))
+            <p class="mb-2 text-sm font-medium text-red-700">{{ session('error') }}</p>
+        @endif
+        <div class="flex flex-wrap items-center gap-3">
+            <span class="text-sm text-gray-600">
+                <span class="font-bold">Acceso del colaborador:</span>
+                {{ $empleado->usuario ? 'usuario ' . $empleado->usuario->usuario : 'sin usuario' }}
+            </span>
+            <form action="{{ route('empleados.restablecer_acceso', $empleado->id) }}" method="POST" onsubmit="return confirm('La clave volverá a ser la identificación del colaborador. ¿Continuar?');">
+                @csrf
+                <button type="submit" class="px-3 py-1 text-sm bg-white border border-gray-300 rounded-md font-bold text-gray-700 hover:bg-gray-100">
+                    {{ $empleado->usuario ? 'Restablecer contraseña' : 'Crear acceso' }}
+                </button>
+            </form>
+        </div>
+    </div>
 </div>
+        @endunless
 
             <!-- NOTA: enctype="multipart/form-data" es obligatorio para subir fotos -->
             <form action="{{ route('empleados.update', $empleado->id) }}" method="POST" enctype="multipart/form-data">
                 @csrf 
                 @method('PUT')
+
+                <!-- El colaborador ve su ficha sin poder modificarla -->
+                <fieldset @disabled($soloLectura)>
                 
                 <!-- FOTO DE PERFIL -->
                 <h3 class="text-lg font-bold text-blue-600 border-b mb-4 pb-2">Fotografía</h3>
@@ -598,10 +625,14 @@
                     + Añadir Otra Referencia Personal
                 </button>
 
+                </fieldset>
+
+                @unless($soloLectura)
                 <div class="flex justify-end mt-6">
                     <a href="{{ route('empleados.index') }}" class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded mr-2">Cancelar</a>
                     <button type="submit" class="bg-blue-600 hover:bg-blue-800 text-white font-bold py-2 px-4 rounded">Actualizar Empleado</button>
                 </div>
+                @endunless
             </form>
         </div>
     </div>

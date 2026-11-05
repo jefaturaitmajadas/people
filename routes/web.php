@@ -224,6 +224,9 @@ Route::middleware(['auth',  'entorno.activo'])->group(function () {
 
     Route::delete('/prestamos/{prestamo}', [App\Http\Controllers\PrestamoController::class, 'destroy'])->name('prestamos.destroy');
 
+    // Devuelve al colaborador su clave inicial (identificación)
+    Route::post('/empleados/{empleado}/restablecer-acceso', [EmpleadoController::class, 'restablecerAcceso'])->name('empleados.restablecer_acceso');
+
     // Cumpleañeros del mes
     Route::get('/reportes/cumpleanos', [App\Http\Controllers\CumpleanosController::class, 'index'])->name('reportes.cumpleanos');
     Route::get('/reportes/cumpleanos/arte', [App\Http\Controllers\CumpleanosController::class, 'arte'])->name('reportes.cumpleanos.arte');

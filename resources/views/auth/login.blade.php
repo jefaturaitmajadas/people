@@ -47,10 +47,10 @@
                 <form method="POST" action="{{ route('login') }}">
                     @csrf
 
-                    <!-- Correo Electrónico -->
+                    <!-- Correo o Identificación -->
                     <div class="mb-5">
-                        <label for="email" class="block font-bold text-sm text-gray-700 mb-2">Correo Electrónico</label>
-                        <input id="email" type="email" name="email" value="{{ old('email') }}" required autofocus autocomplete="username" 
+                        <label for="email" class="block font-bold text-sm text-gray-700 mb-2">Correo o Identificación</label>
+                        <input id="email" type="text" name="email" value="{{ old('email') }}" required autofocus autocomplete="username" 
                             class="w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors" placeholder="ejemplo@empresa.com">
                         @error('email')
                             <p class="text-red-500 text-xs mt-2 font-semibold">{{ $message }}</p>

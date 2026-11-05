@@ -32,6 +32,7 @@ class Empleado extends Model
     // --- Relaciones ---
     public function tipoIdentificacion() { return $this->belongsTo(EmplDocIdentificacion::class, 'identificacion_id'); }
     public function empresa() { return $this->belongsTo(Empresa::class); }
+    public function usuario() { return $this->hasOne(User::class); }
     public function tipoContrato() { return $this->belongsTo(TipoContrato::class); }
     public function turno() { return $this->belongsTo(Turno::class); }
     public function tipoSalario() { return $this->belongsTo(TipoSalario::class); }

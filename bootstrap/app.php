@@ -15,6 +15,11 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'entorno.activo' => \App\Http\Middleware\CheckEntornoActivo::class,
         ]);
+
+        // Se aplica a todas las rutas: un colaborador solo llega a lo que este middleware permite
+        $middleware->web(append: [
+            \App\Http\Middleware\ControlAccesoEmpleado::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

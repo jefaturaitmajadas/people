@@ -27,7 +27,8 @@ class UserController extends Controller
     public function index()
     {
         $this->verificarAdmin();
-        $usuarios = User::with('empresas')->get();
+        // Los accesos de colaboradores se administran desde su ficha
+        $usuarios = User::with('empresas')->where('rol', '!=', 'empleado')->get();
         return view('users.index', compact('usuarios'));
     }
 

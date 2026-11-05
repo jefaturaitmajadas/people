@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Empleado;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 // Asegúrate de importar todos los modelos necesarios aquí
@@ -132,6 +133,8 @@ class EmpleadoController extends Controller
             }
         }
 
+        User::sincronizarAccesoEmpleado($empleado);
+
         return redirect()->route('empleados.index')->with('success', 'Empleado registrado exitosamente.');
     }
 
@@ -146,7 +149,13 @@ class EmpleadoController extends Controller
         ]);
         $catalogos = $this->cargarCatalogos();
         $catalogos['empleado'] = $empleado;
+        $catalogos['soloLectura'] = auth()->user()->isEmpleado();
 
+        // El colaborador solo ve su ficha: no se le envía el listado de empleados ni de empresas
+        if ($catalogos['soloLectura']) {
+            $catalogos['jefes'] = Empleado::whereKey($empleado->jefe_id)->get();
+            $catalogos['empresas'] = Empresa::whereKey($empleado->empresa_id)->get();
+        }
         
         return view('empleados.edit', $catalogos);
     }
@@ -299,8 +308,23 @@ class EmpleadoController extends Controller
             $empleado->referenciasPersonales()->delete();
         }
 
+        User::sincronizarAccesoEmpleado($empleado);
+
         //dd($empleado);
         return redirect()->route('empleados.index')->with('success', 'Empleado actualizado exitosamente.');
+    }
+
+    public function restablecerAcceso(Empleado $empleado)
+    {
+        $user = User::sincronizarAccesoEmpleado($empleado);
+
+        if (!$user) {
+            return back()->with('error', 'No se puede dar acceso: el colaborador no tiene identificación, ya tiene fecha de baja o su identificación está repetida.');
+        }
+
+        $user->update(['password' => $user->usuario, 'debe_cambiar_password' => true]);
+
+        return back()->with('success', 'Acceso restablecido. La clave vuelve a ser la identificación y se pedirá cambiarla al ingresar.');
     }
 
     public function destroy(Empleado $empleado)
