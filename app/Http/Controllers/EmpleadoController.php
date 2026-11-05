@@ -11,6 +11,30 @@ use App\Models\{Profesion, TipoDocumento, GradoAcademico, Empresa,  TipoContrato
 
 class EmpleadoController extends Controller
 {
+    // Lo único que el colaborador puede cambiar de su ficha: Información Base y Datos Personales.
+    // La identificación no está porque es su usuario de acceso; solo RRHH la cambia
+    private const CAMPOS_COLABORADOR = [
+        'primer_nombre', 'segundo_nombre', 'primer_apellido', 'segundo_apellido', 'casada_apellido',
+        'telefono', 'telefono_casa', 'correo_corporativo', 'correo_personal',
+        'nit', 'no_igss', 'irtra', 'genero_id', 'estado_civil_id', 'religion_id', 'fecha_nacimiento',
+        'pais_nacimiento_id', 'municipio_nacimiento_id', 'pueblo_id', 'comunidad_linguistica_id',
+        'nivel_educativo_id', 'profesion_id', 'contacto_emergencia', 'telefono_contacto_emergencia',
+        'pais_residencia_id', 'direccion_exacta', 'discapacidad_id', 'ocupacion_id', 'vive_con',
+        'tipo_casa_id', 'tipo_transporte_id', 'cantidad_hijos', 'cantidad_dependientes',
+        'nombre_padre', 'telefono_padre', 'nombre_madre', 'telefono_madre', 'nombre_conyuge', 'telefono_conyuge',
+    ];
+
+    private const BOOLEANOS_COLABORADOR = ['aplica_credito_fiscal_isr', 'vehiculo'];
+
+    // Columnas que el colaborador puede enviar en cada lista de su ficha
+    private const FILAS_COLABORADOR = [
+        'experiencias' => ['id', 'empresa', 'puesto', 'fecha_inicio', 'fecha_fin', 'telefono_empresa', 'direccion_empresa', 'primer_salario', 'segundo_salario', 'motivo_retiro', 'observaciones'],
+        'formaciones' => ['id', 'grado_academico_id', 'institucion', 'fecha_inicio', 'fecha_fin'],
+        'documentos' => ['id', 'tipo_documento_id', 'descripcion', 'fecha_emision', 'fecha_vencimiento', 'observaciones'],
+        'referencias_laborales' => ['id', 'nombre', 'empresa', 'telefono'],
+        'referencias_personales' => ['id', 'nombre', 'empresa', 'telefono'],
+    ];
+
     public function index()
     {
         $empleados = Empleado::with(['puesto', 'departamento'])->get();
@@ -149,22 +173,33 @@ class EmpleadoController extends Controller
         ]);
         $catalogos = $this->cargarCatalogos();
         $catalogos['empleado'] = $empleado;
-        $catalogos['soloLectura'] = auth()->user()->isEmpleado();
-
-        // El colaborador solo ve su ficha: no se le envía el listado de empleados ni de empresas
-        if ($catalogos['soloLectura']) {
-            $catalogos['jefes'] = Empleado::whereKey($empleado->jefe_id)->get();
-            $catalogos['empresas'] = Empresa::whereKey($empleado->empresa_id)->get();
-        }
+        $catalogos['esColaborador'] = auth()->user()->isEmpleado();
         
         return view('empleados.edit', $catalogos);
     }
 
     public function update(Request $request, Empleado $empleado)
     {
+        $esColaborador = $request->user()->isEmpleado();
+
         $booleans = ['genera_planilla', 'contratable', 'aplica_credito_fiscal_isr', 'vehiculo', 'salario_fijo', 'pertenece_asociacion', 'pension_alimentaria', 'embargo', 'marca_reloj'];
         $data = $request->all();
-        
+
+        if ($esColaborador) {
+            $this->validarColaborador($request);
+
+            $booleans = self::BOOLEANOS_COLABORADOR;
+            $data = $request->only(self::CAMPOS_COLABORADOR);
+            $data['segundo_apellido'] = $data['segundo_apellido'] ?? '';
+
+            // Se descarta cualquier otra columna enviada en las listas, como empleado_id o archivo_ruta
+            foreach (self::FILAS_COLABORADOR as $lista => $columnas) {
+                if ($request->has($lista)) {
+                    $request->merge([$lista => array_map(fn ($fila) => array_intersect_key((array) $fila, array_flip($columnas)), (array) $request->input($lista, []))]);
+                }
+            }
+        }
+
         foreach ($booleans as $field) {
             $data[$field] = $request->has($field);
         }
@@ -310,8 +345,42 @@ class EmpleadoController extends Controller
 
         User::sincronizarAccesoEmpleado($empleado);
 
+        if ($esColaborador) {
+            return redirect()->route('empleados.edit', $empleado->id)->with('success', 'Tus datos se guardaron correctamente.');
+        }
+
         //dd($empleado);
         return redirect()->route('empleados.index')->with('success', 'Empleado actualizado exitosamente.');
+    }
+
+    private function validarColaborador(Request $request)
+    {
+        $request->validate([
+            'primer_nombre' => 'required|string|max:255',
+            'primer_apellido' => 'required|string|max:255',
+            'correo_corporativo' => 'nullable|email|max:255',
+            'correo_personal' => 'nullable|email|max:255',
+            'fecha_nacimiento' => 'nullable|date',
+            'cantidad_hijos' => 'nullable|integer|min:0',
+            'cantidad_dependientes' => 'nullable|integer|min:0',
+            'foto_perfil' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:5120',
+            'documentos.*.archivo' => 'nullable|file|mimes:pdf,jpg,jpeg,png,doc,docx,xls,xlsx|max:10240',
+            'documentos.*.fecha_emision' => 'required_with:documentos.*.descripcion|nullable|date',
+            'referencias_laborales.*.telefono' => 'required_with:referencias_laborales.*.nombre',
+        ], [
+            'primer_nombre.required' => 'El primer nombre es obligatorio.',
+            'primer_apellido.required' => 'El primer apellido es obligatorio.',
+            'correo_corporativo.email' => 'El correo corporativo no es válido.',
+            'correo_personal.email' => 'El correo personal no es válido.',
+            'fecha_nacimiento.date' => 'La fecha de nacimiento no es válida.',
+            'foto_perfil.image' => 'La foto debe ser una imagen.',
+            'foto_perfil.mimes' => 'La foto debe ser JPG, PNG o WEBP.',
+            'foto_perfil.max' => 'La foto no puede pesar más de 5 MB.',
+            'documentos.*.fecha_emision.required_with' => 'Escribe la fecha de emisión de cada documento.',
+            'referencias_laborales.*.telefono.required_with' => 'Escribe el teléfono de cada referencia laboral.',
+            'documentos.*.archivo.mimes' => 'Los documentos deben ser PDF, imagen, Word o Excel.',
+            'documentos.*.archivo.max' => 'Cada documento puede pesar máximo 10 MB.',
+        ]);
     }
 
     public function restablecerAcceso(Empleado $empleado)

@@ -1,12 +1,12 @@
 <x-app-layout>
     <x-slot name="header">
-        <h2 class="font-semibold text-xl text-gray-800">{{ $soloLectura ? 'Mi Ficha' : 'Editar Empleado' }}: {{ $empleado->primer_nombre }} {{ $empleado->primer_apellido }}</h2>
+        <h2 class="font-semibold text-xl text-gray-800">{{ $esColaborador ? 'Mi Ficha' : 'Editar Empleado' }}: {{ $empleado->primer_nombre }} {{ $empleado->primer_apellido }}</h2>
     </x-slot>
     
     <div class="py-12 max-w-7xl mx-auto sm:px-6 lg:px-8">
         <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg p-6">
 
-        @unless($soloLectura)
+        @unless($esColaborador)
         <div class="mb-8 bg-gray-50 border border-gray-200 rounded-lg p-4 shadow-sm">
     <h3 class="text-sm font-bold text-gray-500 uppercase tracking-wider mb-3">Gestión de Nómina y Planilla</h3>
     
@@ -92,13 +92,24 @@
 </div>
         @endunless
 
+            @if($esColaborador)
+                @if(session('success'))
+                    <div class="mb-6 p-3 text-sm font-medium text-green-700 bg-green-50 border border-green-200 rounded">{{ session('success') }}</div>
+                @endif
+                @if($errors->any())
+                    <div class="mb-6 p-3 text-sm text-red-700 bg-red-50 border border-red-200 rounded">
+                        @foreach($errors->all() as $error)
+                            <p>{{ $error }}</p>
+                        @endforeach
+                    </div>
+                @endif
+            @endif
+
             <!-- NOTA: enctype="multipart/form-data" es obligatorio para subir fotos -->
             <form action="{{ route('empleados.update', $empleado->id) }}" method="POST" enctype="multipart/form-data">
                 @csrf 
                 @method('PUT')
 
-                <!-- El colaborador ve su ficha sin poder modificarla -->
-                <fieldset @disabled($soloLectura)>
                 
                 <!-- FOTO DE PERFIL -->
                 <h3 class="text-lg font-bold text-blue-600 border-b mb-4 pb-2">Fotografía</h3>
@@ -117,6 +128,8 @@
                     </div>
                 </div>
 
+                {{-- El colaborador no ve estas secciones: se quitan del HTML, no solo se ocultan --}}
+                @unless($esColaborador)
                 <!-- INFORMACIÓN CORPORATIVA -->
                 <h3 class="text-lg font-bold text-blue-600 border-b mb-4 pb-2">Información Corporativa</h3>
                 <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
@@ -153,6 +166,8 @@
                     </div>
                 </div>
 
+                @endunless
+
                 <!-- INFORMACIÓN BASE -->
                 <h3 class="text-lg font-bold text-blue-600 border-b mb-4 pb-2">Información Base</h3>
                 <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
@@ -166,18 +181,19 @@
 
                     <div>
                         <label class="text-sm font-bold">Tipo de Identificación</label>
-                        <select name="identificacion_id" class="w-full border rounded p-2">
+                        <select name="identificacion_id" class="w-full border rounded p-2 disabled:bg-gray-100" @disabled($esColaborador)>
                             <option value="">Seleccione</option>
                             @foreach($tipo_identificaciones as $t)
                                 <option value="{{ $t->id }}" {{ $empleado->identificacion_id == $t->id ? 'selected' : '' }}>{{ $t->documento_identificacion }}</option>
                             @endforeach
                         </select>
                     </div>
-                    <div><label class="text-sm font-bold text-gray-700">No. de Identificación</label><input type="text" name="identificacion" value="{{ old('identificacion', $empleado->identificacion) }}" class="w-full border rounded p-2"></div>
+                    <div><label class="text-sm font-bold text-gray-700">No. de Identificación</label><input type="text" name="identificacion" value="{{ old('identificacion', $empleado->identificacion) }}" class="w-full border rounded p-2 disabled:bg-gray-100" @disabled($esColaborador)></div>
                     <div><label class="text-sm font-bold text-gray-700">Correo Corporativo</label><input type="email" name="correo_corporativo" value="{{ old('correo_corporativo', $empleado->correo_corporativo) }}" class="w-full border rounded p-2"></div>
                     <div><label class="text-sm font-bold text-gray-700">Correo Personal</label><input type="email" name="correo_personal" value="{{ old('correo_personal', $empleado->correo_personal) }}" class="w-full border rounded p-2"></div>
                 </div>
 
+                @unless($esColaborador)
                 <!-- GESTIÓN -->
                 <h3 class="text-lg font-bold text-blue-600 border-b mb-4 pb-2">Gestión y Contrato</h3>
                 <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
@@ -206,6 +222,8 @@
                         <label><input type="checkbox" name="contratable" {{ $empleado->contratable ? 'checked' : '' }}> Contratable</label>
                     </div>
                 </div>
+
+                @endunless
 
                 <!-- PERSONAL -->
                 <h3 class="text-lg font-bold text-blue-600 border-b mb-4 pb-2">Datos Personales</h3>
@@ -356,6 +374,7 @@
                     <div><label class="text-sm font-bold">Teléfono de Conyuge</label><input type="text" name="telefono_conyuge" value="{{ old('telefono_conyuge', $empleado->telefono_conyuge) }}" class="w-full border rounded p-2"></div>
                 </div>
 
+                @unless($esColaborador)
                 <!-- NÓMINA Y FINANZAS -->
                 <h3 class="text-lg font-bold text-blue-600 border-b mb-4 pb-2">Nómina y Finanzas</h3>
                 <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
@@ -452,6 +471,8 @@
                         @enderror
                     </div>
                 </div>
+
+                @endunless
 
                 <!-- EXPERIENCIA LABORAL DINÁMICA -->
                 <h3 class="text-lg font-bold text-blue-600 border-b mb-4 pb-2 mt-8">Experiencia Laboral</h3>
@@ -625,14 +646,12 @@
                     + Añadir Otra Referencia Personal
                 </button>
 
-                </fieldset>
-
-                @unless($soloLectura)
                 <div class="flex justify-end mt-6">
+                    @unless($esColaborador)
                     <a href="{{ route('empleados.index') }}" class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded mr-2">Cancelar</a>
-                    <button type="submit" class="bg-blue-600 hover:bg-blue-800 text-white font-bold py-2 px-4 rounded">Actualizar Empleado</button>
+                    @endunless
+                    <button type="submit" class="bg-blue-600 hover:bg-blue-800 text-white font-bold py-2 px-4 rounded">{{ $esColaborador ? 'Guardar Cambios' : 'Actualizar Empleado' }}</button>
                 </div>
-                @endunless
             </form>
         </div>
     </div>

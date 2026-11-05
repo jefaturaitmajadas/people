@@ -213,6 +213,8 @@ Route::middleware(['auth',  'entorno.activo'])->group(function () {
 
     Route::get('/reportes/vacaciones', [App\Http\Controllers\ReporteController::class, 'reporteVacaciones'])->name('reportes.vacaciones');
     Route::get('/reportes/vacaciones/excel', [App\Http\Controllers\ReporteController::class, 'exportarVacacionesExcel'])->name('reportes.vacaciones.excel');
+    Route::get('/reportes/empleados', [App\Http\Controllers\ReporteController::class, 'reporteEmpleados'])->name('reportes.empleados');
+    Route::get('/reportes/empleados/excel', [App\Http\Controllers\ReporteController::class, 'exportarEmpleadosExcel'])->name('reportes.empleados.excel');
 
     // Gestión de Préstamos
     Route::get('/empleados/{empleado}/prestamos', [App\Http\Controllers\PrestamoController::class, 'index'])->name('empleados.prestamos.index');

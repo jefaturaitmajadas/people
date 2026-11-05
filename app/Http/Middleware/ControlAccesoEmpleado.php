@@ -48,11 +48,11 @@ class ControlAccesoEmpleado
         }
 
         if ($empleado) {
-            // Todo lo que no sea su propia ficha queda bloqueado
+            // Todo lo que no sea ver o guardar su propia ficha queda bloqueado
             $ficha = $request->route('empleado');
             $fichaId = is_object($ficha) ? $ficha->getKey() : $ficha;
 
-            if ($request->routeIs('empleados.edit') && (int) $fichaId === $empleado->id) {
+            if ($request->routeIs('empleados.edit', 'empleados.update') && (int) $fichaId === $empleado->id) {
                 return $next($request);
             }
 
