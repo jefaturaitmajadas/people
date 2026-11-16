@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Empleado;
 use App\Models\Empresa;
+use App\Models\Prestamo;
 use App\Models\User;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Http\UploadedFile;
@@ -76,6 +77,65 @@ class AccesoEmpleadoTest extends TestCase
         $this->assertTrue(Hash::check('ClaveNueva2026', $user->password));
 
         $this->get('/dashboard')->assertRedirect(route('empleados.edit', $empleado->id));
+    }
+
+    private function crearPrestamo(Empleado $empleado, string $estado = 'Activo'): Prestamo
+    {
+        return Prestamo::create([
+            'empleado_id' => $empleado->id, 'monto_solicitado' => 1000, 'monto_total' => 1010,
+            'frecuencia' => 'Mensual', 'cantidad_cuotas' => 2, 'estado' => $estado,
+        ]);
+    }
+
+    public function test_el_colaborador_consulta_sus_anticipos_sin_gestionarlos(): void
+    {
+        $empleado = $this->crearEmpleado();
+        $otro = $this->crearEmpleado(['empresa_id' => $empleado->empresa_id, 'identificacion' => '9999999999999']);
+        $propio = $this->crearPrestamo($empleado);
+        $borrador = $this->crearPrestamo($empleado, 'Borrador');
+        $ajeno = $this->crearPrestamo($otro);
+        $user = User::sincronizarAccesoEmpleado($empleado);
+        $user->update(['debe_cambiar_password' => false]);
+
+        $this->actingAs($user);
+        $ficha = route('empleados.edit', $empleado->id);
+        $anticipos = route('empleados.prestamos.index', $empleado->id);
+
+        $this->get($ficha)->assertOk()->assertSee($anticipos);
+
+        $this->get($anticipos)->assertOk()
+            ->assertSee('Capacidad de Endeudamiento')->assertSee('Historial de Anticipos')
+            ->assertSee(route('prestamos.estado_cuenta', $propio->id))
+            ->assertSee(route('prestamos.estado_cuenta', $borrador->id))
+            ->assertDontSee('Generar Nuevo Anticipo')->assertDontSee('name="monto_solicitado"', false)
+            ->assertDontSee(route('prestamos.contrato', $propio->id))
+            ->assertDontSee(route('prestamos.aprobar', $borrador->id))
+            ->assertDontSee('action="' . route('prestamos.destroy', $borrador->id) . '"', false);
+
+        $this->get(route('prestamos.estado_cuenta', $propio->id))->assertOk();
+
+        foreach ([route('prestamos.estado_cuenta', $ajeno->id), route('empleados.prestamos.index', $otro->id), route('prestamos.contrato', $propio->id)] as $url) {
+            $this->get($url)->assertRedirect($ficha);
+        }
+
+        $this->post(route('empleados.prestamos.store', $empleado->id), ['monto_solicitado' => 1, 'frecuencia' => 'Mensual', 'cantidad_cuotas' => 1])->assertForbidden();
+        $this->post(route('prestamos.aprobar', $borrador->id))->assertForbidden();
+        $this->delete(route('prestamos.destroy', $borrador->id))->assertForbidden();
+        $this->assertSame('Borrador', $borrador->fresh()->estado);
+    }
+
+    public function test_rrhh_sigue_gestionando_anticipos(): void
+    {
+        $empleado = $this->crearEmpleado();
+        $prestamo = $this->crearPrestamo($empleado, 'Borrador');
+        $admin = new User();
+        $admin->forceFill(['name' => 'RRHH', 'email' => 'rrhh@prueba.test', 'password' => 'clave-prueba', 'rol' => 'generalista'])->save();
+
+        $this->actingAs($admin)->withSession(['empresa_activa_id' => $empleado->empresa_id])
+            ->get(route('empleados.prestamos.index', $empleado->id))->assertOk()
+            ->assertSee('Generar Nuevo Anticipo')
+            ->assertSee(route('prestamos.contrato', $prestamo->id))
+            ->assertSee(route('prestamos.aprobar', $prestamo->id));
     }
 
     public function test_solo_ve_y_guarda_su_ficha(): void

@@ -2,6 +2,8 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\Empleado;
+use App\Models\Prestamo;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -48,11 +50,8 @@ class ControlAccesoEmpleado
         }
 
         if ($empleado) {
-            // Todo lo que no sea ver o guardar su propia ficha queda bloqueado
-            $ficha = $request->route('empleado');
-            $fichaId = is_object($ficha) ? $ficha->getKey() : $ficha;
-
-            if ($request->routeIs('empleados.edit', 'empleados.update') && (int) $fichaId === $empleado->id) {
+            // Todo lo que no sea su ficha o la consulta de sus anticipos queda bloqueado
+            if ($this->rutaPermitida($request, $empleado)) {
                 return $next($request);
             }
 
@@ -64,5 +63,21 @@ class ControlAccesoEmpleado
         }
 
         return $next($request);
+    }
+
+    private function rutaPermitida(Request $request, Empleado $empleado): bool
+    {
+        if ($request->routeIs('prestamos.estado_cuenta')) {
+            $prestamo = $request->route('prestamo');
+            $prestamo = is_object($prestamo) ? $prestamo : Prestamo::find($prestamo);
+
+            return $prestamo?->empleado_id === $empleado->id;
+        }
+
+        $ficha = $request->route('empleado');
+        $fichaId = is_object($ficha) ? $ficha->getKey() : $ficha;
+
+        return $request->routeIs('empleados.edit', 'empleados.update', 'empleados.prestamos.index')
+            && (int) $fichaId === $empleado->id;
     }
 }

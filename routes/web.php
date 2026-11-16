@@ -194,6 +194,9 @@ Route::middleware(['auth',  'entorno.activo'])->group(function () {
     Route::get('/empleados/{empleado}/reporte', [EmpleadoController::class, 'reporte'])->name('empleados.reporte');
     Route::get('/empleados/{empleado}/constancia', [EmpleadoController::class, 'constancia'])->name('empleados.constancia');
 
+    Route::get('planillas/{planilla}/excel', [PlanillaController::class, 'exportarExcel'])->name('planillas.excel');
+    Route::post('planillas/{planilla}/notificar', [\App\Http\Controllers\PlanillaNotificacionController::class, 'enviarMasivo'])->name('planillas.notificar');
+    Route::post('planilla-detalles/{detalle}/notificar-prueba', [\App\Http\Controllers\PlanillaNotificacionController::class, 'enviarIndividual'])->name('planillas.notificar_prueba');
     Route::get('planillas/{planilla}/archivo-bancos', [PlanillaController::class, 'exportarBancos'])->name('planillas.bancos');
     Route::resource('empresa-cuentas', App\Http\Controllers\EmpresaCuentaController::class)
          ->parameters(['empresa-cuentas' => 'empresaCuenta']);

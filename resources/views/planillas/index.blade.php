@@ -77,6 +77,15 @@
                                     </a>
                                     
                                 {{-- @endif --}}
+                                @if($planilla->estado == 'cerrada')
+                                    <form action="{{ route('planillas.notificar', $planilla->id) }}" method="POST" class="inline" onsubmit="return confirm('Se enviará la boleta por correo a cada empleado de esta planilla (solo a los que aún no la han recibido). ¿Deseas continuar?');">
+                                        @csrf
+                                        <button type="submit" class="text-purple-600 hover:text-purple-900 font-bold ml-2 text-sm border border-purple-600 px-2 py-1 rounded hover:bg-purple-50 transition-colors">
+                                            <svg class="w-4 h-4 inline-block mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+                                            Enviar Boletas
+                                        </button>
+                                    </form>
+                                @endif
                                 @if($planilla->estado == 'borrador')
                                     <form action="{{ route('planillas.destroy', $planilla->id) }}" method="POST" class="inline" onsubmit="return confirm('¿Seguro que deseas eliminar este borrador? No afectará saldos de empleados.')">
                                         @csrf @method('DELETE')

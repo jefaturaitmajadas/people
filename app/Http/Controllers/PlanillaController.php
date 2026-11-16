@@ -24,6 +24,9 @@ use Maatwebsite\Excel\Facades\Excel;
 
 class PlanillaController extends Controller
 {
+    // tipo_descuentos.id = 4 (Seguro): cuota mensual que en planilla quincenal se divide entre 2
+    private const TIPO_DESCUENTO_SEGURO = 4;
+
     public function index()
     {
         $planillas = Planilla::orderBy('created_at', 'desc')->get();
@@ -70,6 +73,11 @@ class PlanillaController extends Controller
             ]);
 
             $total_nomina = 0;
+
+            // Primera quincena = el período inicia entre el día 1 y el 15 del mes
+            $esPrimeraQuincena = $request->tipo_periodo == 'quincenal'
+                && Carbon::parse($request->fecha_inicio)->day <= 15;
+
             //$empleados = Empleado::where('mano_obra_id',$tipoPlanilla)->where('codigo_empleado',124)->get(); 
             $empleados = Empleado::where('mano_obra_id',$tipoPlanilla)->whereNull('fecha_salida')->get(); 
 
@@ -117,26 +125,42 @@ class PlanillaController extends Controller
                 // Solo se calcula ISR si el salario base es MAYOR al mínimo legal
                 if ($salario_base > $salario_minimo_vigente) {
                     
-                    $mesPlanilla = Carbon::parse($request->fecha_inicio)->month;
+                    $fechaPlanilla = Carbon::parse($request->fecha_inicio);
+                    $mesPlanilla = $fechaPlanilla->month;
                     $mesProyectado = 12 - $mesPlanilla;
-                    
-                    //Historico
-                    $salarioAnteriores = PlanillaDetalle::
-                        join('planillas','planillas.id','planilla_detalles.planilla_id')
-                        ->where('planilla_detalles.empleado_id',$empleado->id)
-                        ->where('planillas.estado','cerrada')
-                        ->sum('salario_base_mes');
-                    
-                        
+
+                    // Histórico: solo planillas cerradas del mismo año fiscal (ene-dic)
+                    // y anteriores a la planilla que se está generando.
+                    $historico = function () use ($empleado, $fechaPlanilla) {
+                        return PlanillaDetalle::join('planillas', 'planillas.id', 'planilla_detalles.planilla_id')
+                            ->where('planilla_detalles.empleado_id', $empleado->id)
+                            ->where('planillas.estado', 'cerrada')
+                            ->where('planillas.fecha_inicio', '>=', $fechaPlanilla->copy()->startOfYear()->toDateString())
+                            ->where('planillas.fecha_inicio', '<', $fechaPlanilla->toDateString());
+                    };
+
+                    // Para salario, bono decreto e IGSS el mes actual se proyecta completo,
+                    // por eso el histórico de esos conceptos excluye el mes en curso
+                    // (evita contar dos veces la 1ra quincena al calcular la 2da).
+                    $historicoMesesAnteriores = function () use ($historico, $fechaPlanilla) {
+                        return $historico()
+                            ->where('planillas.fecha_inicio', '<', $fechaPlanilla->copy()->startOfMonth()->toDateString());
+                    };
+
+                    // Planillas generadas por el sistema: se suma lo devengado real (salario_proporcional),
+                    // porque salario_base_mes guarda el salario mensual completo en cada quincena.
+                    // Planillas históricas cargadas (salario_proporcional = 0 con días > 0): el monto
+                    // del período viene en salario_base_mes.
+                    $salarioAnteriores = $historicoMesesAnteriores()->sum(DB::raw(
+                        'CASE WHEN planilla_detalles.salario_proporcional > 0 THEN planilla_detalles.salario_proporcional
+                              WHEN planilla_detalles.dias_trabajados = 0 THEN 0
+                              ELSE planilla_detalles.salario_base_mes END'
+                    ));
 
                     $salariosProyectados       = ($salario_base * $mesProyectado) + $salario_base;
                     $ingreso_anual_proyectado  = ($salarioAnteriores+$salariosProyectados);
 
-                    $historicoHorasExtras = PlanillaDetalle::
-                        join('planillas','planillas.id','planilla_detalles.planilla_id')
-                        ->where('planilla_detalles.empleado_id',$empleado->id)
-                        ->where('planillas.estado','cerrada')
-                        ->sum('total_horas_extras');
+                    $historicoHorasExtras = $historico()->sum('planilla_detalles.total_horas_extras');
 
                     $horasExtrasActuales = HoraExtra::where('empleado_id',$empleado->id)
                         ->where('pagado',0)
@@ -145,11 +169,7 @@ class PlanillaController extends Controller
                     $horaExtraProyectado = $historicoHorasExtras + $horasExtrasActuales;
 
                      
-                    $historicoIngresosAdicionales = PlanillaDetalle::
-                        join('planillas','planillas.id','planilla_detalles.planilla_id')
-                        ->where('planilla_detalles.empleado_id',$empleado->id)
-                        ->where('planillas.estado','cerrada')
-                        ->sum('total_ingresos_adicionales');
+                    $historicoIngresosAdicionales = $historico()->sum('planilla_detalles.total_ingresos_adicionales');
                     
                     $ingresosAdicionalesActuales = Ingreso::where('empleado_id',$empleado->id)
                         ->where('estado',1)
@@ -158,11 +178,7 @@ class PlanillaController extends Controller
                     $ingreosAdicionalesProyectado = $historicoIngresosAdicionales + $ingresosAdicionalesActuales;
 
                     
-                    $historicoBonoDecreto = PlanillaDetalle::
-                        join('planillas','planillas.id','planilla_detalles.planilla_id')
-                        ->where('planilla_detalles.empleado_id',$empleado->id)
-                        ->where('planillas.estado','cerrada')
-                        ->sum('bono_decreto');
+                    $historicoBonoDecreto = $historicoMesesAnteriores()->sum('planilla_detalles.bono_decreto');
 
                     $bonoDecretoActuales = ($base_bono_decreto * $mesProyectado) + $base_bono_decreto;
 
@@ -176,11 +192,7 @@ class PlanillaController extends Controller
                     $gastos_personales = 54051.36; // Deducción fija
                     //$igss_anual = $ingreso_anual_proyectado * 0.0483;
 
-                    $historicoIgss = PlanillaDetalle::
-                        join('planillas','planillas.id','planilla_detalles.planilla_id')
-                        ->where('planilla_detalles.empleado_id',$empleado->id)
-                        ->where('planillas.estado','cerrada')
-                        ->sum('igss_laboral');
+                    $historicoIgss = $historicoMesesAnteriores()->sum('planilla_detalles.igss_laboral');
                     
                     $igssFuturo       = (($salario_base * 0.0483) * ($mesProyectado + 1));
                     $igss_anual = $historicoIgss + $igssFuturo;
@@ -193,11 +205,8 @@ class PlanillaController extends Controller
 
                     
 
-                    $historicoISR = PlanillaDetalle::
-                        join('planillas','planillas.id','planilla_detalles.planilla_id')
-                        ->where('planilla_detalles.empleado_id',$empleado->id)
-                        ->where('planillas.estado','cerrada')
-                        ->sum('isr');
+                    // El ISR ya retenido incluye todo el año (también la 1ra quincena del mes)
+                    $historicoISR = $historico()->sum('planilla_detalles.isr');
                     
                     
 
@@ -277,7 +286,9 @@ class PlanillaController extends Controller
                         $isr_mensual = $impuesto_anual / ($mesProyectado + 1); // *** aca es los meses que faltan
                         
                         if ($request->tipo_periodo == 'quincenal') {
-                            $isr_descuento = $isr_mensual / 2;
+                            // Operativos (quincenal): la 1ra quincena no lleva ISR,
+                            // en la 2da quincena se descuenta el ISR mensual completo.
+                            $isr_descuento = $esPrimeraQuincena ? 0 : $isr_mensual;
                         } elseif ($request->tipo_periodo == 'semanal') {
                             $isr_descuento = $isr_mensual / 4;
                         } else {
@@ -301,8 +312,9 @@ class PlanillaController extends Controller
                 $total_descuentos = 0;
 
                 //$isr_descuento =0; //984.6639
-                
-                // Sumamos el ISR al bloque de descuentos
+
+                // Sumamos el ISR al bloque de descuentos (a centavos, igual que se guarda)
+                $isr_descuento = round($isr_descuento, 2);
                 $total_descuentos += $isr_descuento;
                 
                 // --- NUEVO: CÁLCULO DE PRÉSTAMOS ---
@@ -321,14 +333,37 @@ class PlanillaController extends Controller
                     $q->where('empleado_id', $empleado->id);
                 })->where('pagado', false)->where('fecha_cobro_proyectada', '<=', $request->fecha_fin)->sum('monto');
                 
-                $total_descuentos += Descuento::where('empleado_id', $empleado->id)
+                // Descuentos recurrentes: la cuota es mensual. En planilla quincenal (operativos)
+                // los de tipo Seguro (tipo_descuento_id = 4) se cobran a la mitad en cada quincena.
+                $descuentosRecurrentes = Descuento::where('empleado_id', $empleado->id)
                     ->whereNull('monto_total')
-                    ->where('estado', true)->sum('cuota');
-                
+                    ->where('estado', true)
+                    ->get(['tipo_descuento_id', 'cuota']);
+
+                foreach ($descuentosRecurrentes as $descuentoRecurrente) {
+                    $cuota = (float) $descuentoRecurrente->cuota;
+
+                    if ($request->tipo_periodo == 'quincenal' && $descuentoRecurrente->tipo_descuento_id == self::TIPO_DESCUENTO_SEGURO) {
+                        $cuota = $cuota / 2;
+                    }
+
+                    $total_descuentos += round($cuota, 2);
+                }
+
                 //dd($total_descuentos);
 
+                // Todo a centavos antes del líquido, para que el recibo cuadre exacto:
+                // ingresos - IGSS - descuentos = líquido (sin diferencias de Q0.01)
+                $salario_proporcional      = round($salario_proporcional, 2);
+                $proporcional_bono_decreto = round($proporcional_bono_decreto, 2);
+                $total_horas_extras        = round($total_horas_extras, 2);
+                $total_ingresos            = round($total_ingresos, 2);
+                $igss_laboral              = round($igss_laboral, 2);
+                $descuento_prestamos       = round($descuento_prestamos, 2);
+                $total_descuentos          = round($total_descuentos, 2);
+
                 // H. Líquido a Recibir
-                $liquido = $salario_proporcional + $proporcional_bono_decreto +$total_horas_extras + $total_ingresos - $igss_laboral - $total_descuentos;
+                $liquido =$salario_proporcional + $proporcional_bono_decreto +$total_horas_extras + $total_ingresos - $igss_laboral - $total_descuentos;
 
                 //dd($salario_proporcional , $total_horas_extras , $total_ingresos , $igss_laboral , $total_descuentos);
                     
@@ -650,6 +685,14 @@ class PlanillaController extends Controller
     {
         $detalle->load(['planilla', 'empleado']);
         return view('planillas.recibo', compact('detalle'));
+    }
+
+    public function exportarExcel(Planilla $planilla)
+    {
+        return \Maatwebsite\Excel\Facades\Excel::download(
+            new \App\Exports\PlanillaDetalleExport($planilla),
+            'Planilla_' . $planilla->codigo . '.xlsx'
+        );
     }
 
     public function exportarBancos(Planilla $planilla)

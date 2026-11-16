@@ -16,7 +16,9 @@ class PrestamoController extends Controller
         $disponibilidad = $empleado->calcularDisponibilidadPrestamo();
         $prestamos = $empleado->prestamos()->with('cuotas')->orderBy('created_at', 'desc')->get();
 
-        return view('empleados.prestamos.index', compact('empleado', 'disponibilidad', 'prestamos'));
+        $esColaborador = auth()->user()->isEmpleado();
+
+        return view('empleados.prestamos.index', compact('empleado', 'disponibilidad', 'prestamos', 'esColaborador'));
     }
 
     public function store(Request $request, Empleado $empleado)

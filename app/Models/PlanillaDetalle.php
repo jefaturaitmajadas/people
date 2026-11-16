@@ -11,7 +11,12 @@ class PlanillaDetalle extends Model
     protected $fillable = [
         'planilla_id', 'empleado_id', 'dias_trabajados', 'salario_base_mes',
         'salario_proporcional', 'total_horas_extras', 'total_ingresos_adicionales',
-        'igss_laboral', 'total_descuentos', 'liquido_a_recibir','isr','bono_decreto','pago_prestamos'
+        'igss_laboral', 'total_descuentos', 'liquido_a_recibir','isr','bono_decreto','pago_prestamos',
+        'notificacion_enviada_at'
+    ];
+
+    protected $casts = [
+        'notificacion_enviada_at' => 'datetime',
     ];
 
     public function planilla()

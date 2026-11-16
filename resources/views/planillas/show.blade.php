@@ -22,6 +22,15 @@
                         <p class="text-sm text-gray-500 font-bold uppercase">Total a Desembolsar</p>
                         <p class="text-3xl font-black text-indigo-700">Q. {{ number_format($planilla->total_nomina, 2) }}</p>
                     </div>
+                    <div class="mt-3">
+                        <a href="{{ route('planillas.excel', $planilla->id) }}"
+                           class="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-sm py-2 px-4 rounded shadow">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V4" />
+                            </svg>
+                            Descargar Excel
+                        </a>
+                    </div>
                 </div>
             </div>
 
@@ -94,6 +103,15 @@
                                     <a href="{{ route('planillas.recibo', $detalle->id) }}" class="text-blue-600 hover:text-blue-900 text-sm font-bold border border-blue-600 px-3 py-1 rounded hover:bg-blue-50">
                                         Ver Recibo
                                     </a>
+                                    <form action="{{ route('planillas.notificar_prueba', $detalle->id) }}" method="POST" class="inline">
+                                        @csrf
+                                        <button type="submit" title="Envía esta boleta a jefaturait@majadas.com para revisar cómo se ve" class="ml-1 text-purple-600 hover:text-purple-900 text-sm font-bold border border-purple-600 px-3 py-1 rounded hover:bg-purple-50">
+                                            Emitir Notificación
+                                        </button>
+                                    </form>
+                                    @if($detalle->notificacion_enviada_at)
+                                        <div class="text-xs text-green-600 mt-1">Enviada {{ $detalle->notificacion_enviada_at->format('d/m/Y H:i') }}</div>
+                                    @endif
                                 </td>
                             </tr>
                         @endforeach

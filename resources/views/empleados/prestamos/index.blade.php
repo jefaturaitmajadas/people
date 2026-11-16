@@ -2,10 +2,10 @@
     <x-slot name="header">
         <div class="flex justify-between items-center">
             <h2 class="font-semibold text-xl text-gray-800">
-                Gestión de Anticipo: <span class="text-indigo-600">{{ $empleado->primer_nombre }} {{ $empleado->primer_apellido }}</span>
+                {{ $esColaborador ? 'Mis Anticipos' : 'Gestión de Anticipo' }}: <span class="text-indigo-600">{{ $empleado->primer_nombre }} {{ $empleado->primer_apellido }}</span>
             </h2>
             <a href="{{ route('empleados.edit', $empleado->id) }}" class="text-gray-600 hover:text-gray-900 font-bold text-sm">
-                ← Volver al Expediente
+                ← {{ $esColaborador ? 'Volver a Mi Ficha' : 'Volver al Expediente' }}
             </a>
         </div>
     </x-slot>
@@ -54,6 +54,7 @@
                 </div>
 
                 <!-- Formulario -->
+                @unless($esColaborador)
                 <div class="bg-white p-6 rounded-lg shadow">
                     <h3 class="font-bold text-gray-700 mb-4 uppercase text-sm border-b pb-2">Generar Nuevo Anticipo</h3>
                     
@@ -83,6 +84,7 @@
                         </button>
                     </form>
                 </div>
+                @endunless
             </div>
 
             <!-- PANEL DERECHO: Historial -->
@@ -120,9 +122,11 @@
                                             @endif
                                         </td>
                                         <td class="p-3 text-center flex justify-center gap-2">
+                                            @unless($esColaborador)
                                             <a href="{{ route('prestamos.contrato', $p->id) }}" target="_blank" class="text-blue-600 hover:underline font-bold text-xs">Contrato</a>
+                                            @endunless
                                             
-                                            @if($p->estado == 'Borrador')
+                                            @if($p->estado == 'Borrador' && !$esColaborador)
                                                 <!-- Botón Aprobar -->
                                                 <form action="{{ route('prestamos.aprobar', $p->id) }}" method="POST">
                                                     @csrf
